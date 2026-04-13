@@ -44,6 +44,23 @@ function cleanHeader(value: string): string {
   return value.replace(/["']/g, "").trim();
 }
 
+function parseRows(csvText: string): AmazonCSVRow[] {
+  const parsed = Papa.parse<AmazonCSVRow>(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: cleanHeader
+  });
+
+  if (parsed.errors.length > 0) {
+    const firstError = parsed.errors[0];
+    throw new Error(
+      `CSV parse failed at row ${firstError.row ?? "unknown"}: ${firstError.message}`
+    );
+  }
+
+  return parsed.data;
+}
+
 function getRowValue(row: AmazonCSVRow, ...keys: string[]): string {
   for (const key of keys) {
     if (row[key] !== undefined) {
@@ -99,25 +116,20 @@ export function normalizeRow(
 }
 
 export function parseAmazonCSV(
-  file: string,
+  filePath: string,
+  options: ParseAmazonCSVOptions = {}
+): Transaction[] {
+  return parseAmazonCSVContent(fs.readFileSync(filePath), options);
+}
+
+export function parseAmazonCSVContent(
+  content: Buffer | string,
   options: ParseAmazonCSVOptions = {}
 ): Transaction[] {
   const sellerState = options.sellerState ?? DEFAULT_SELLER_STATE;
-  const csvText = fs.readFileSync(file, "utf8");
-  const parsed = Papa.parse<AmazonCSVRow>(csvText, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: cleanHeader
-  });
+  const csvText = typeof content === "string" ? content : content.toString("utf8");
 
-  if (parsed.errors.length > 0) {
-    const firstError = parsed.errors[0];
-    throw new Error(
-      `CSV parse failed at row ${firstError.row ?? "unknown"}: ${firstError.message}`
-    );
-  }
-
-  return parsed.data
+  return parseRows(csvText)
     .map((row) => normalizeRow(row, sellerState))
     .filter((row): row is NormalizedTransaction => row !== null)
     .map(({ pos: _pos, ...transaction }) => transaction);
