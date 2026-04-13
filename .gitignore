@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.xlsx
+*.csv
+
+# Exclude data JSON files but keep config JSON
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+
+frontend/node_modules/
+frontend/dist/

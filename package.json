@@ -1,0 +1,23 @@
+{
+  "name": "gsttool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "decimal.js": "^10.4.3",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/papaparse": "^5.3.16",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
