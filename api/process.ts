@@ -66,12 +66,10 @@ async function handlePost(request: Request): Promise<Response> {
   }
 }
 
-export default {
-  async fetch(request: Request): Promise<Response> {
-    if (request.method !== "POST") {
-      return jsonResponse({ message: "Method not allowed." }, 405);
-    }
+export function GET(): Response {
+  return jsonResponse({ ok: true });
+}
 
-    return handlePost(request);
-  }
-};
+export async function POST(request: Request): Promise<Response> {
+  return handlePost(request);
+}
