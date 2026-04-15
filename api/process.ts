@@ -66,10 +66,14 @@ async function handlePost(request: Request): Promise<Response> {
   }
 }
 
-export function GET(): Response {
-  return jsonResponse({ ok: true });
-}
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method === "GET") {
+    return jsonResponse({ ok: true });
+  }
 
-export async function POST(request: Request): Promise<Response> {
-  return handlePost(request);
+  if (request.method === "POST") {
+    return handlePost(request);
+  }
+
+  return jsonResponse({ message: "Method not allowed." }, 405);
 }
