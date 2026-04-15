@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.aggregateB2CS = aggregateB2CS;
 exports.aggregateB2B = aggregateB2B;
+exports.deriveFp = deriveFp;
 exports.aggregateHSN = aggregateHSN;
 exports.aggregateSupeco = aggregateSupeco;
 exports.aggregateDocumentIssues = aggregateDocumentIssues;
@@ -183,10 +184,24 @@ function aggregateB2B(records) {
         };
     });
 }
+function deriveFp(records) {
+    const freq = new Map();
+    for (const record of records) {
+        // documentDate format: "DD-MM-YYYY"
+        const parts = record.documentDate.split("-");
+        if (parts.length === 3 && parts[1].length === 2 && parts[2].length === 4) {
+            const key = `${parts[1]}${parts[2]}`; // MMYYYY
+            freq.set(key, (freq.get(key) ?? 0) + 1);
+        }
+    }
+    if (freq.size === 0)
+        return null;
+    return [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
 function aggregateHSN(records) {
     const group = (section) => {
         const grouped = new Map();
-        for (const record of records.filter((item) => item.section === section)) {
+        for (const record of records.filter((item) => item.section === section && item.hsn !== "" && item.quantity.greaterThan(0))) {
             const rate = round2(record.rate);
             const key = `${record.hsn}|${rate}`;
             const current = grouped.get(key);
@@ -221,10 +236,9 @@ function aggregateHSN(records) {
             csamt: 0
         }));
     };
-    return {
-        hsn_b2b: group("b2b"),
-        hsn_b2c: group("b2cs")
-    };
+    const hsn_b2b = group("b2b");
+    const hsn_b2c = group("b2cs");
+    return hsn_b2c.length > 0 ? { hsn_b2b, hsn_b2c } : { hsn_b2b };
 }
 function aggregateSupeco(records) {
     const grouped = new Map();

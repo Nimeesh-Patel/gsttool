@@ -1,10 +1,9 @@
-import { buildMonthlyGSTR1 } from "../src/gst/gstr1";
+import { buildMonthlyGSTR1, deriveFp } from "../src/gst/gstr1";
 import { parseAmazonB2BContent, parseAmazonB2CContent } from "../src/parsers/amazon";
 import { parseFlipkartWorkbook } from "../src/parsers/flipkart";
 import { DEFAULT_SELLER_STATE } from "../src/utils/stateCodes";
 
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "032026";
 
 function getSafeString(value: FormDataEntryValue | null, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -25,7 +24,6 @@ function assertProcessInputs(
     amazonB2C: File;
     flipkart: File;
   },
-  fp: string,
   sellerState: string
 ): void {
   if (!files.amazonB2B.name.toLowerCase().endsWith(".csv")) {
@@ -38,10 +36,6 @@ function assertProcessInputs(
 
   if (!files.flipkart.name.toLowerCase().endsWith(".xlsx")) {
     throw new Error("Flipkart upload must be an XLSX file.");
-  }
-
-  if (!/^\d{6}$/.test(fp)) {
-    throw new Error(`Invalid filing period "${fp}". Expected MMYYYY.`);
   }
 
   if (!/^\d{2}$/.test(sellerState)) {
@@ -67,11 +61,10 @@ async function handlePost(request: Request): Promise<Response> {
       flipkart: getFile(formData, "flipkart")
     };
 
-    const fp = getSafeString(formData.get("fp"), DEFAULT_FP);
     const gstin = getSafeString(formData.get("gstin"), DEFAULT_GSTIN);
     const sellerState = getSafeString(formData.get("sellerState"), DEFAULT_SELLER_STATE);
 
-    assertProcessInputs(files, fp, sellerState);
+    assertProcessInputs(files, sellerState);
 
     const amazonB2BData = parseAmazonB2BContent(
       Buffer.from(await files.amazonB2B.arrayBuffer()),
@@ -86,8 +79,16 @@ async function handlePost(request: Request): Promise<Response> {
       { sellerState }
     );
 
+    const allRecords = [...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records];
+    const fpInput = formData.get("fp");
+    const userFp = typeof fpInput === "string" && /^\d{6}$/.test(fpInput.trim()) ? fpInput.trim() : null;
+    const fp = userFp ?? deriveFp(allRecords);
+    if (!fp) {
+      throw new Error("Could not determine filing period from data. Provide fp explicitly.");
+    }
+
     const payload = buildMonthlyGSTR1(
-      [...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records],
+      allRecords,
       [
         ...amazonB2BData.documentIssues,
         ...amazonB2CData.documentIssues,

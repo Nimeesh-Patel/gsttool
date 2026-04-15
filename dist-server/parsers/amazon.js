@@ -3,18 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeRow = normalizeRow;
-exports.parseAmazonCSV = parseAmazonCSV;
-exports.parseAmazonCSVContent = parseAmazonCSVContent;
 exports.parseAmazonB2BContent = parseAmazonB2BContent;
 exports.parseAmazonB2CContent = parseAmazonB2CContent;
-const node_fs_1 = __importDefault(require("node:fs"));
 const papaparse_1 = __importDefault(require("papaparse"));
 const decimal_js_1 = __importDefault(require("decimal.js"));
 const stateCodes_1 = require("../utils/stateCodes");
 const AMAZON_HEADERS = {
     transactionType: "Transaction Type",
-    shipToState: "Ship To State",
     taxableValue: "Tax Exclusive Gross",
     totalTaxAmount: "Total Tax Amount",
     igstRate: "Igst Rate",
@@ -167,47 +162,6 @@ function buildAmazonSupplyRecord(row, section, sellerState) {
         receiverName: section === "b2b" ? getRowValue(row, "Buyer Name") : undefined
     };
 }
-function toTaxRate(row) {
-    return toDecimal(getRowValue(row, AMAZON_HEADERS.igstRate))
-        .plus(toDecimal(getRowValue(row, AMAZON_HEADERS.cgstRate)))
-        .plus(toDecimal(getRowValue(row, AMAZON_HEADERS.sgstRate)))
-        .plus(toDecimal(getRowValue(row, AMAZON_HEADERS.utgstRate)))
-        .mul(100);
-}
-function isShipmentRow(row) {
-    return getRowValue(row, AMAZON_HEADERS.transactionType).toLowerCase() === "shipment";
-}
-function normalizeRow(row, sellerState = stateCodes_1.DEFAULT_SELLER_STATE) {
-    if (!isShipmentRow(row)) {
-        return null;
-    }
-    const pos = (0, stateCodes_1.toGSTStateCode)(getRowValue(row, AMAZON_HEADERS.shipToState, "ship state"));
-    const taxableValue = toDecimal(getRowValue(row, AMAZON_HEADERS.taxableValue, "taxable value"));
-    const taxAmount = toDecimal(getRowValue(row, AMAZON_HEADERS.totalTaxAmount, "tax amount"));
-    const taxRate = toTaxRate(row);
-    if (taxableValue.lte(0) || taxAmount.lt(0) || taxRate.lt(0)) {
-        return null;
-    }
-    return {
-        pos,
-        shipState: pos,
-        taxableValue,
-        taxAmount,
-        taxRate,
-        supplyType: (0, stateCodes_1.getSupplyType)(pos, sellerState)
-    };
-}
-function parseAmazonCSV(filePath, options = {}) {
-    return parseAmazonCSVContent(node_fs_1.default.readFileSync(filePath), options);
-}
-function parseAmazonCSVContent(content, options = {}) {
-    const sellerState = options.sellerState ?? stateCodes_1.DEFAULT_SELLER_STATE;
-    const csvText = typeof content === "string" ? content : content.toString("utf8");
-    return parseRows(csvText)
-        .map((row) => normalizeRow(row, sellerState))
-        .filter((row) => row !== null)
-        .map(({ pos: _pos, ...transaction }) => transaction);
-}
 function parseAmazonB2BContent(content, options = {}) {
     const sellerState = options.sellerState ?? stateCodes_1.DEFAULT_SELLER_STATE;
     const csvText = typeof content === "string" ? content : content.toString("utf8");
@@ -253,10 +207,7 @@ function parseAmazonB2CContent(content, options = {}) {
         .map((row) => {
         const category = getAmazonDocumentCategory(row);
         const gstin = getRowValue(row, "Customer Bill To Gstid", "Customer Ship To Gstid");
-        if (!category || gstin || category === "invoice" && getRowValue(row, AMAZON_HEADERS.transactionType).toLowerCase() === "cancel") {
-            return null;
-        }
-        if (getRowValue(row, AMAZON_HEADERS.transactionType).toLowerCase() === "cancel") {
+        if (!category || gstin) {
             return null;
         }
         return buildAmazonDocumentIssue(row);

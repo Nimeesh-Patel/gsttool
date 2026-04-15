@@ -93,7 +93,8 @@ function buildSalesRecord(row, sellerState) {
     const igst = toDecimal(row["IGST Amount"] ?? "");
     const cgst = toDecimal(row["CGST Amount"] ?? "");
     const sgst = toDecimal(row["SGST Amount (Or UTGST as applicable)"] ?? "");
-    const quantity = toDecimal(row["Item Quantity"] ?? "");
+    const rawQuantity = toDecimal(row["Item Quantity"] ?? "");
+    const quantity = taxableValue.lessThan(0) ? rawQuantity.negated() : rawQuantity;
     const hsn = (row["HSN Code"] ?? "").trim();
     const rate = getRate(row);
     const ctin = getBusinessGstin(row);

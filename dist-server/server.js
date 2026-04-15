@@ -13,7 +13,6 @@ const amazon_1 = require("./parsers/amazon");
 const flipkart_1 = require("./parsers/flipkart");
 const stateCodes_1 = require("./utils/stateCodes");
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "032026";
 const DEFAULT_PORT = 3000;
 const app = (0, express_1.default)();
 const upload = (0, multer_1.default)({
@@ -32,7 +31,7 @@ function getSingleUpload(files, key) {
     }
     return file;
 }
-function assertProcessInputs(files, fp, sellerState) {
+function assertProcessInputs(files, sellerState) {
     if (!files.amazonB2B.originalname.toLowerCase().endsWith(".csv")) {
         throw new Error("Amazon B2B must be a CSV file.");
     }
@@ -41,9 +40,6 @@ function assertProcessInputs(files, fp, sellerState) {
     }
     if (!files.flipkart.originalname.toLowerCase().endsWith(".xlsx")) {
         throw new Error("Flipkart upload must be an XLSX file.");
-    }
-    if (!/^\d{6}$/.test(fp)) {
-        throw new Error(`Invalid filing period "${fp}". Expected MMYYYY.`);
     }
     if (!/^\d{2}$/.test(sellerState)) {
         throw new Error(`Invalid seller state "${sellerState}". Expected 2-digit GST code.`);
@@ -62,14 +58,20 @@ app.post(["/process", "/api/process"], upload.fields([
         const amazonB2B = getSingleUpload(files, "amazonB2B");
         const amazonB2C = getSingleUpload(files, "amazonB2C");
         const flipkart = getSingleUpload(files, "flipkart");
-        const fp = getSafeString(request.body?.fp, DEFAULT_FP);
         const gstin = getSafeString(request.body?.gstin, DEFAULT_GSTIN);
         const sellerState = getSafeString(request.body?.sellerState, stateCodes_1.DEFAULT_SELLER_STATE);
-        assertProcessInputs({ amazonB2B, amazonB2C, flipkart }, fp, sellerState);
+        assertProcessInputs({ amazonB2B, amazonB2C, flipkart }, sellerState);
         const amazonB2BData = (0, amazon_1.parseAmazonB2BContent)(amazonB2B.buffer, { sellerState });
         const amazonB2CData = (0, amazon_1.parseAmazonB2CContent)(amazonB2C.buffer, { sellerState });
         const flipkartData = (0, flipkart_1.parseFlipkartWorkbook)(flipkart.buffer, { sellerState });
-        const payload = (0, gstr1_1.buildMonthlyGSTR1)([...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records], [
+        const allRecords = [...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records];
+        const fpInput = request.body?.fp;
+        const userFp = typeof fpInput === "string" && /^\d{6}$/.test(fpInput.trim()) ? fpInput.trim() : null;
+        const fp = userFp ?? (0, gstr1_1.deriveFp)(allRecords);
+        if (!fp) {
+            throw new Error("Could not determine filing period from data. Provide fp explicitly.");
+        }
+        const payload = (0, gstr1_1.buildMonthlyGSTR1)(allRecords, [
             ...amazonB2BData.documentIssues,
             ...amazonB2CData.documentIssues,
             ...flipkartData.documentIssues
@@ -89,7 +91,7 @@ function startServer(port = DEFAULT_PORT) {
 function writeReferenceOutput(outputPath) {
     const payload = (0, gstr1_1.buildMonthlyGSTR1)([], [], {
         gstin: DEFAULT_GSTIN,
-        fp: DEFAULT_FP
+        fp: "000000"
     });
     node_fs_1.default.writeFileSync(outputPath, JSON.stringify(payload, null, 2), "utf8");
 }

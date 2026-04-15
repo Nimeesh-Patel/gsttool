@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { buildMonthlyGSTR1 } from "./gst/gstr1";
+import { buildMonthlyGSTR1, deriveFp } from "./gst/gstr1";
 import { parseAmazonB2BContent, parseAmazonB2CContent } from "./parsers/amazon";
 import { parseFlipkartWorkbook } from "./parsers/flipkart";
 import { DEFAULT_SELLER_STATE } from "./utils/stateCodes";
@@ -12,7 +12,6 @@ export * from "./parsers/flipkart";
 export * from "./utils/stateCodes";
 
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "032026";
 const DEFAULT_OUTPUT_FILE = "gstr1-returns.json";
 
 export interface MonthlyRunOptions {
@@ -21,7 +20,7 @@ export interface MonthlyRunOptions {
   flipkart: string;
   output: string;
   gstin: string;
-  fp: string;
+  fp?: string;
   sellerState: string;
 }
 
@@ -46,7 +45,7 @@ function getCLIOptions(): MonthlyRunOptions {
     flipkart: path.resolve(process.cwd(), requireArg("--flipkart")),
     output: path.resolve(process.cwd(), readArg("--output") ?? DEFAULT_OUTPUT_FILE),
     gstin: readArg("--gstin") ?? DEFAULT_GSTIN,
-    fp: readArg("--fp") ?? DEFAULT_FP,
+    fp: readArg("--fp"),
     sellerState: readArg("--seller-state") ?? DEFAULT_SELLER_STATE
   };
 }
@@ -58,7 +57,7 @@ function assertCLIOptions(options: MonthlyRunOptions): void {
     }
   }
 
-  if (!/^\d{6}$/.test(options.fp)) {
+  if (options.fp !== undefined && !/^\d{6}$/.test(options.fp)) {
     throw new Error(`Invalid filing period "${options.fp}". Expected MMYYYY.`);
   }
 
@@ -87,9 +86,14 @@ export function runMonthly(options: MonthlyRunOptions): void {
     ...flipkart.documentIssues
   ];
 
+  const fp = options.fp ?? deriveFp(records);
+  if (!fp) {
+    throw new Error("Could not determine filing period from data. Provide --fp explicitly.");
+  }
+
   const payload = buildMonthlyGSTR1(records, documentIssues, {
     gstin: options.gstin,
-    fp: options.fp
+    fp
   });
 
   fs.writeFileSync(options.output, JSON.stringify(payload, null, 2), "utf8");

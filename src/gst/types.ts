@@ -126,7 +126,7 @@ export interface GSTR1Payload {
   b2cs: B2CSItem[];
   hsn: {
     hsn_b2b: HSNItem[];
-    hsn_b2c: HSNItem[];
+    hsn_b2c?: HSNItem[];
   };
   supeco: {
     clttx: SupecoItem[];

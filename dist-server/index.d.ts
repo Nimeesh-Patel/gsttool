@@ -9,7 +9,7 @@ export interface MonthlyRunOptions {
     flipkart: string;
     output: string;
     gstin: string;
-    fp: string;
+    fp?: string;
     sellerState: string;
 }
 export declare function runMonthly(options: MonthlyRunOptions): void;

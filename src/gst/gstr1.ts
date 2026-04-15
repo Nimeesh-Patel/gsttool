@@ -242,9 +242,23 @@ export function aggregateB2B(records: NormalizedSupplyRecord[]): B2BRecipient[] 
   });
 }
 
+export function deriveFp(records: NormalizedSupplyRecord[]): string | null {
+  const freq = new Map<string, number>();
+  for (const record of records) {
+    // documentDate format: "DD-MM-YYYY"
+    const parts = record.documentDate.split("-");
+    if (parts.length === 3 && parts[1].length === 2 && parts[2].length === 4) {
+      const key = `${parts[1]}${parts[2]}`; // MMYYYY
+      freq.set(key, (freq.get(key) ?? 0) + 1);
+    }
+  }
+  if (freq.size === 0) return null;
+  return [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export function aggregateHSN(records: NormalizedSupplyRecord[]): {
   hsn_b2b: HSNItem[];
-  hsn_b2c: HSNItem[];
+  hsn_b2c?: HSNItem[];
 } {
   const group = (section: "b2b" | "b2cs"): HSNItem[] => {
     const grouped = new Map<
@@ -260,15 +274,15 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
       }
     >();
 
-    for (const record of records.filter((item) => item.section === section)) {
+    for (const record of records.filter(
+      (item) => item.section === section && item.hsn !== "" && item.quantity.greaterThan(0)
+    )) {
       const rate = round2(record.rate);
       const key = `${record.hsn}|${rate}`;
       const current = grouped.get(key);
 
       if (current) {
-        if (record.quantity.greaterThan(0)) {
-          current.qty = current.qty.plus(record.quantity);
-        }
+        current.qty = current.qty.plus(record.quantity);
         current.txval = current.txval.plus(record.taxableValue);
         current.iamt = current.iamt.plus(record.igst);
         current.camt = current.camt.plus(record.cgst);
@@ -279,7 +293,7 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
       grouped.set(key, {
         hsn: record.hsn,
         rate,
-        qty: record.quantity.greaterThan(0) ? new Decimal(record.quantity) : new Decimal(0),
+        qty: new Decimal(record.quantity),
         txval: new Decimal(record.taxableValue),
         iamt: new Decimal(record.igst),
         camt: new Decimal(record.cgst),
@@ -301,10 +315,9 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
     }));
   };
 
-  return {
-    hsn_b2b: group("b2b"),
-    hsn_b2c: group("b2cs")
-  };
+  const hsn_b2b = group("b2b");
+  const hsn_b2c = group("b2cs");
+  return hsn_b2c.length > 0 ? { hsn_b2b, hsn_b2c } : { hsn_b2b };
 }
 
 export function aggregateSupeco(records: NormalizedSupplyRecord[]): { clttx: SupecoItem[] } {

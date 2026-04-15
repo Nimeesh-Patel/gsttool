@@ -1,13 +1,12 @@
 import express, { Request, Response } from "express";
 import fs from "node:fs";
 import multer from "multer";
-import { buildMonthlyGSTR1 } from "./gst/gstr1";
+import { buildMonthlyGSTR1, deriveFp } from "./gst/gstr1";
 import { parseAmazonB2BContent, parseAmazonB2CContent } from "./parsers/amazon";
 import { parseFlipkartWorkbook } from "./parsers/flipkart";
 import { DEFAULT_SELLER_STATE } from "./utils/stateCodes";
 
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "032026";
 const DEFAULT_PORT = 3000;
 
 const app = express();
@@ -49,7 +48,6 @@ function assertProcessInputs(
     amazonB2C: Express.Multer.File;
     flipkart: Express.Multer.File;
   },
-  fp: string,
   sellerState: string
 ): void {
   if (!files.amazonB2B.originalname.toLowerCase().endsWith(".csv")) {
@@ -62,10 +60,6 @@ function assertProcessInputs(
 
   if (!files.flipkart.originalname.toLowerCase().endsWith(".xlsx")) {
     throw new Error("Flipkart upload must be an XLSX file.");
-  }
-
-  if (!/^\d{6}$/.test(fp)) {
-    throw new Error(`Invalid filing period "${fp}". Expected MMYYYY.`);
   }
 
   if (!/^\d{2}$/.test(sellerState)) {
@@ -94,18 +88,25 @@ app.post(
       const amazonB2C = getSingleUpload(files, "amazonB2C");
       const flipkart = getSingleUpload(files, "flipkart");
 
-      const fp = getSafeString(request.body?.fp, DEFAULT_FP);
       const gstin = getSafeString(request.body?.gstin, DEFAULT_GSTIN);
       const sellerState = getSafeString(request.body?.sellerState, DEFAULT_SELLER_STATE);
 
-      assertProcessInputs({ amazonB2B, amazonB2C, flipkart }, fp, sellerState);
+      assertProcessInputs({ amazonB2B, amazonB2C, flipkart }, sellerState);
 
       const amazonB2BData = parseAmazonB2BContent(amazonB2B.buffer, { sellerState });
       const amazonB2CData = parseAmazonB2CContent(amazonB2C.buffer, { sellerState });
       const flipkartData = parseFlipkartWorkbook(flipkart.buffer, { sellerState });
 
+      const allRecords = [...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records];
+      const fpInput = request.body?.fp;
+      const userFp = typeof fpInput === "string" && /^\d{6}$/.test(fpInput.trim()) ? fpInput.trim() : null;
+      const fp = userFp ?? deriveFp(allRecords);
+      if (!fp) {
+        throw new Error("Could not determine filing period from data. Provide fp explicitly.");
+      }
+
       const payload = buildMonthlyGSTR1(
-        [...amazonB2BData.records, ...amazonB2CData.records, ...flipkartData.records],
+        allRecords,
         [
           ...amazonB2BData.documentIssues,
           ...amazonB2CData.documentIssues,
@@ -131,7 +132,7 @@ export function startServer(port: number = DEFAULT_PORT): void {
 export function writeReferenceOutput(outputPath: string): void {
   const payload = buildMonthlyGSTR1([], [], {
     gstin: DEFAULT_GSTIN,
-    fp: DEFAULT_FP
+    fp: "000000"
   });
   fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2), "utf8");
 }
