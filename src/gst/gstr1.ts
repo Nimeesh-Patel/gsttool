@@ -266,7 +266,9 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
       const current = grouped.get(key);
 
       if (current) {
-        current.qty = current.qty.plus(record.quantity);
+        if (record.quantity.greaterThan(0)) {
+          current.qty = current.qty.plus(record.quantity);
+        }
         current.txval = current.txval.plus(record.taxableValue);
         current.iamt = current.iamt.plus(record.igst);
         current.camt = current.camt.plus(record.cgst);
@@ -277,7 +279,7 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
       grouped.set(key, {
         hsn: record.hsn,
         rate,
-        qty: new Decimal(record.quantity),
+        qty: record.quantity.greaterThan(0) ? new Decimal(record.quantity) : new Decimal(0),
         txval: new Decimal(record.taxableValue),
         iamt: new Decimal(record.igst),
         camt: new Decimal(record.cgst),
