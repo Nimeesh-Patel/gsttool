@@ -5,6 +5,9 @@
   "type": "commonjs",
   "main": "dist-server/index.js",
   "types": "dist-server/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.server.json && vite build",
     "build:server": "tsc -p tsconfig.server.json",
