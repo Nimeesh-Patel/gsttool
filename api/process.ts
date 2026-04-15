@@ -2,8 +2,6 @@ import { aggregateB2CS, buildGSTR1 } from "../src/gst/b2cs";
 import { parseAmazonCSVContent } from "../src/parsers/amazon";
 import { DEFAULT_SELLER_STATE } from "../src/utils/stateCodes";
 
-export const config = { runtime: "nodejs" };
-
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
 const DEFAULT_FP = "022026";
 
@@ -49,8 +47,8 @@ async function handlePost(request: Request): Promise<Response> {
 
     assertProcessInputs(file.name, fp, sellerState);
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const transactions = parseAmazonCSVContent(fileBuffer, {
+    const fileText = await file.text();
+    const transactions = parseAmazonCSVContent(fileText, {
       sellerState
     });
     const b2cs = aggregateB2CS(transactions, {
