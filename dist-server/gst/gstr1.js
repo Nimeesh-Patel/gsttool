@@ -200,22 +200,23 @@ function deriveFp(records) {
 }
 function aggregateHSN(records) {
     const group = (section) => {
-        // Pass 1: aggregate txval and tax from GST-valid rows (same set as b2cs)
-        const valueMap = new Map();
+        const grouped = new Map();
         for (const record of records.filter((item) => item.section === section && item.hsn !== "")) {
             const rate = round2(record.rate);
             const key = `${record.hsn}|${rate}`;
-            const current = valueMap.get(key);
+            const current = grouped.get(key);
             if (current) {
+                current.qty = current.qty.plus(record.quantity);
                 current.txval = current.txval.plus(record.taxableValue);
                 current.iamt = current.iamt.plus(record.igst);
                 current.camt = current.camt.plus(record.cgst);
                 current.samt = current.samt.plus(record.sgst);
             }
             else {
-                valueMap.set(key, {
+                grouped.set(key, {
                     hsn: record.hsn,
                     rate,
+                    qty: new decimal_js_1.default(record.quantity),
                     txval: new decimal_js_1.default(record.taxableValue),
                     iamt: new decimal_js_1.default(record.igst),
                     camt: new decimal_js_1.default(record.cgst),
@@ -223,18 +224,11 @@ function aggregateHSN(records) {
                 });
             }
         }
-        // Pass 2: aggregate quantity independently — all rows with valid HSN and qty > 0
-        const qtyMap = new Map();
-        for (const record of records.filter((item) => item.section === section && item.hsn !== "" && item.quantity.greaterThan(0))) {
-            const rate = round2(record.rate);
-            const key = `${record.hsn}|${rate}`;
-            qtyMap.set(key, (qtyMap.get(key) ?? new decimal_js_1.default(0)).plus(record.quantity));
-        }
-        return Array.from(valueMap.entries()).map(([key, entry], index) => ({
+        return Array.from(grouped.values()).map((entry, index) => ({
             num: index + 1,
             hsn_sc: entry.hsn,
             uqc: "PCS",
-            qty: round2(qtyMap.get(key) ?? new decimal_js_1.default(0)),
+            qty: round2(entry.qty),
             rt: entry.rate,
             txval: round2(entry.txval),
             iamt: round2(entry.iamt),
