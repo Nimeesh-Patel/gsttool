@@ -2,6 +2,8 @@ import { aggregateB2CS, buildGSTR1 } from "../src/gst/b2cs";
 import { parseAmazonCSVContent } from "../src/parsers/amazon";
 import { DEFAULT_SELLER_STATE } from "../src/utils/stateCodes";
 
+export const config = { runtime: "nodejs" };
+
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
 const DEFAULT_FP = "022026";
 
