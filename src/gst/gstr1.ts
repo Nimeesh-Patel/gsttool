@@ -261,51 +261,52 @@ export function aggregateHSN(records: NormalizedSupplyRecord[]): {
   hsn_b2c?: HSNItem[];
 } {
   const group = (section: "b2b" | "b2cs"): HSNItem[] => {
-    const grouped = new Map<
+    // Pass 1: aggregate txval and tax from GST-valid rows (same set as b2cs)
+    const valueMap = new Map<
       string,
-      {
-        hsn: string;
-        rate: number;
-        qty: Decimal;
-        txval: Decimal;
-        iamt: Decimal;
-        camt: Decimal;
-        samt: Decimal;
-      }
+      { hsn: string; rate: number; txval: Decimal; iamt: Decimal; camt: Decimal; samt: Decimal }
     >();
+
+    for (const record of records.filter(
+      (item) => item.section === section && item.hsn !== ""
+    )) {
+      const rate = round2(record.rate);
+      const key = `${record.hsn}|${rate}`;
+      const current = valueMap.get(key);
+
+      if (current) {
+        current.txval = current.txval.plus(record.taxableValue);
+        current.iamt = current.iamt.plus(record.igst);
+        current.camt = current.camt.plus(record.cgst);
+        current.samt = current.samt.plus(record.sgst);
+      } else {
+        valueMap.set(key, {
+          hsn: record.hsn,
+          rate,
+          txval: new Decimal(record.taxableValue),
+          iamt: new Decimal(record.igst),
+          camt: new Decimal(record.cgst),
+          samt: new Decimal(record.sgst)
+        });
+      }
+    }
+
+    // Pass 2: aggregate quantity independently — all rows with valid HSN and qty > 0
+    const qtyMap = new Map<string, Decimal>();
 
     for (const record of records.filter(
       (item) => item.section === section && item.hsn !== "" && item.quantity.greaterThan(0)
     )) {
       const rate = round2(record.rate);
       const key = `${record.hsn}|${rate}`;
-      const current = grouped.get(key);
-
-      if (current) {
-        current.qty = current.qty.plus(record.quantity);
-        current.txval = current.txval.plus(record.taxableValue);
-        current.iamt = current.iamt.plus(record.igst);
-        current.camt = current.camt.plus(record.cgst);
-        current.samt = current.samt.plus(record.sgst);
-        continue;
-      }
-
-      grouped.set(key, {
-        hsn: record.hsn,
-        rate,
-        qty: new Decimal(record.quantity),
-        txval: new Decimal(record.taxableValue),
-        iamt: new Decimal(record.igst),
-        camt: new Decimal(record.cgst),
-        samt: new Decimal(record.sgst)
-      });
+      qtyMap.set(key, (qtyMap.get(key) ?? new Decimal(0)).plus(record.quantity));
     }
 
-    return Array.from(grouped.values()).map((entry, index) => ({
+    return Array.from(valueMap.entries()).map(([key, entry], index) => ({
       num: index + 1,
       hsn_sc: entry.hsn,
       uqc: "PCS" as const,
-      qty: round2(entry.qty),
+      qty: round2(qtyMap.get(key) ?? new Decimal(0)),
       rt: entry.rate,
       txval: round2(entry.txval),
       iamt: round2(entry.iamt),
