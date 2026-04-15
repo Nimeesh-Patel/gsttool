@@ -10,11 +10,11 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:web": "vite build",
     "start": "node dist-server/index.js",
-    "cli:dev": "ts-node src/index.ts",
+    "cli:dev": "ts-node --project tsconfig.server.json src/index.ts",
     "dev:web": "vite",
     "dev": "concurrently \"npm run serve:dev\" \"npm run dev:web\"",
     "serve": "node dist-server/server.js",
-    "serve:dev": "ts-node src/server.ts"
+    "serve:dev": "ts-node --project tsconfig.server.json src/server.ts"
   },
   "dependencies": {
     "decimal.js": "^10.4.3",
