@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      "/api/process": {
+        target: "http://localhost:3000",
+        changeOrigin: true
+      },
       "/process": {
         target: "http://localhost:3000",
         changeOrigin: true

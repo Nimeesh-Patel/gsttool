@@ -8,6 +8,10 @@ export default defineConfig({
             "/process": {
                 target: "http://localhost:3000",
                 changeOrigin: true
+            },
+            "/api/process": {
+                target: "http://localhost:3000",
+                changeOrigin: true
             }
         }
     }

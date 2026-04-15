@@ -3,6 +3,7 @@ import FileUpload from "./components/FileUpload";
 import Result from "./components/Result";
 
 type Status = "ready" | "processing" | "done" | "error";
+const PROCESS_ENDPOINT = import.meta.env.VITE_PROCESS_ENDPOINT ?? "/process";
 
 interface ProcessResult {
   json: unknown;
@@ -29,7 +30,7 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/process", {
+      const response = await fetch(PROCESS_ENDPOINT, {
         method: "POST",
         body: formData
       });

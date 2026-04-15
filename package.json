@@ -3,27 +3,38 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist-server/index.js",
+  "types": "dist-server/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "serve": "node dist/server.js",
+    "build": "tsc -p tsconfig.server.json && vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "start": "node dist-server/index.js",
+    "cli:dev": "ts-node src/index.ts",
+    "dev:web": "vite",
+    "dev": "concurrently \"npm run serve:dev\" \"npm run dev:web\"",
+    "serve": "node dist-server/server.js",
     "serve:dev": "ts-node src/server.ts"
   },
   "dependencies": {
     "decimal.js": "^10.4.3",
     "express": "^5.1.0",
     "multer": "^2.0.2",
-    "papaparse": "^5.4.1"
+    "papaparse": "^5.4.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.2.1",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.15.3",
     "@types/papaparse": "^5.3.16",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^6.4.2"
   }
 }
