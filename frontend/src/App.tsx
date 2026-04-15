@@ -3,22 +3,25 @@ import FileUpload from "./components/FileUpload";
 import Result from "./components/Result";
 
 type Status = "ready" | "processing" | "done" | "error";
-const PROCESS_ENDPOINT = import.meta.env.VITE_PROCESS_ENDPOINT ?? "/process";
+const PROCESS_ENDPOINT = import.meta.env.VITE_PROCESS_ENDPOINT ?? "/api/process";
 
 interface ProcessResult {
   json: unknown;
 }
 
 function App() {
-  const [file, setFile] = useState<File | null>(null);
+  const [amazonB2B, setAmazonB2B] = useState<File | null>(null);
+  const [amazonB2C, setAmazonB2C] = useState<File | null>(null);
+  const [flipkart, setFlipkart] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("ready");
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<ProcessResult | null>(null);
 
   const isLoading = status === "processing";
+  const isReadyToProcess = amazonB2B && amazonB2C && flipkart;
 
   async function handleProcess(): Promise<void> {
-    if (!file || isLoading) {
+    if (!isReadyToProcess || isLoading) {
       return;
     }
 
@@ -28,7 +31,9 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("amazonB2B", amazonB2B);
+      formData.append("amazonB2C", amazonB2C);
+      formData.append("flipkart", flipkart);
 
       const response = await fetch(PROCESS_ENDPOINT, {
         method: "POST",
@@ -66,23 +71,48 @@ function App() {
       <section className="panel">
         <div className="panel-copy">
           <p className="eyebrow">GST Tool</p>
-          <h1>Convert marketplace reports into GSTR-1 JSON</h1>
+          <h1>Build the monthly GSTR-1 from marketplace exports</h1>
           <p className="lede">
-            Upload an Amazon or Flipkart export, process it, and download the generated
-            JSON.
+            Upload Amazon B2B, Amazon B2C, and Flipkart monthly reports together to
+            generate the consolidated GST JSON.
           </p>
         </div>
 
-        <FileUpload file={file} onFileSelect={setFile} disabled={isLoading} />
+        <div className="upload-stack">
+          <FileUpload
+            id="amazon-b2b"
+            label="Amazon B2B CSV"
+            hint="Upload the monthly Amazon MTR_B2B CSV"
+            file={amazonB2B}
+            onFileSelect={setAmazonB2B}
+            disabled={isLoading}
+          />
+          <FileUpload
+            id="amazon-b2c"
+            label="Amazon B2C CSV"
+            hint="Upload the monthly Amazon MTR_B2C CSV"
+            file={amazonB2C}
+            onFileSelect={setAmazonB2C}
+            disabled={isLoading}
+          />
+          <FileUpload
+            id="flipkart"
+            label="Flipkart XLSX"
+            hint="Upload the monthly Flipkart workbook"
+            file={flipkart}
+            onFileSelect={setFlipkart}
+            disabled={isLoading}
+          />
+        </div>
 
         <div className="actions">
           <button
             className="primary-button"
             type="button"
             onClick={handleProcess}
-            disabled={!file || isLoading}
+            disabled={!isReadyToProcess || isLoading}
           >
-            {isLoading ? "Processing..." : "Process File"}
+            {isLoading ? "Processing..." : "Process Files"}
           </button>
           <p className="status">
             Status:{" "}

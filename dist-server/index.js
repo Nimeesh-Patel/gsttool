@@ -17,26 +17,37 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.run = run;
+exports.runMonthly = runMonthly;
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
-const b2cs_1 = require("./gst/b2cs");
+const gstr1_1 = require("./gst/gstr1");
 const amazon_1 = require("./parsers/amazon");
+const flipkart_1 = require("./parsers/flipkart");
 const stateCodes_1 = require("./utils/stateCodes");
-__exportStar(require("./gst/b2cs"), exports);
+__exportStar(require("./gst/gstr1"), exports);
+__exportStar(require("./gst/types"), exports);
 __exportStar(require("./parsers/amazon"), exports);
+__exportStar(require("./parsers/flipkart"), exports);
 __exportStar(require("./utils/stateCodes"), exports);
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "022026";
-const DEFAULT_INPUT_FILE = "MTR_B2C-FEBRUARY-2026-A2G23RCK8NBZ6R.csv";
-const DEFAULT_OUTPUT_FILE = "gstr1-b2cs.json";
+const DEFAULT_FP = "032026";
+const DEFAULT_OUTPUT_FILE = "gstr1-returns.json";
 function readArg(flag) {
     const index = process.argv.indexOf(flag);
     return index >= 0 ? process.argv[index + 1] : undefined;
 }
+function requireArg(flag) {
+    const value = readArg(flag);
+    if (!value) {
+        throw new Error(`Missing required argument ${flag}`);
+    }
+    return value;
+}
 function getCLIOptions() {
     return {
-        input: node_path_1.default.resolve(process.cwd(), readArg("--input") ?? DEFAULT_INPUT_FILE),
+        amazonB2B: node_path_1.default.resolve(process.cwd(), requireArg("--amazon-b2b")),
+        amazonB2C: node_path_1.default.resolve(process.cwd(), requireArg("--amazon-b2c")),
+        flipkart: node_path_1.default.resolve(process.cwd(), requireArg("--flipkart")),
         output: node_path_1.default.resolve(process.cwd(), readArg("--output") ?? DEFAULT_OUTPUT_FILE),
         gstin: readArg("--gstin") ?? DEFAULT_GSTIN,
         fp: readArg("--fp") ?? DEFAULT_FP,
@@ -44,8 +55,10 @@ function getCLIOptions() {
     };
 }
 function assertCLIOptions(options) {
-    if (!node_fs_1.default.existsSync(options.input)) {
-        throw new Error(`Input file not found: ${options.input}`);
+    for (const input of [options.amazonB2B, options.amazonB2C, options.flipkart]) {
+        if (!node_fs_1.default.existsSync(input)) {
+            throw new Error(`Input file not found: ${input}`);
+        }
     }
     if (!/^\d{6}$/.test(options.fp)) {
         throw new Error(`Invalid filing period "${options.fp}". Expected MMYYYY.`);
@@ -54,21 +67,30 @@ function assertCLIOptions(options) {
         throw new Error(`Invalid seller state "${options.sellerState}". Expected 2-digit GST code.`);
     }
 }
-function run(options) {
+function runMonthly(options) {
     assertCLIOptions(options);
-    const transactions = (0, amazon_1.parseAmazonCSV)(options.input, {
+    const amazonB2B = (0, amazon_1.parseAmazonB2BContent)(node_fs_1.default.readFileSync(options.amazonB2B), {
         sellerState: options.sellerState
     });
-    const b2cs = (0, b2cs_1.aggregateB2CS)(transactions, {
+    const amazonB2C = (0, amazon_1.parseAmazonB2CContent)(node_fs_1.default.readFileSync(options.amazonB2C), {
         sellerState: options.sellerState
     });
-    const payload = (0, b2cs_1.buildGSTR1)(b2cs, {
+    const flipkart = (0, flipkart_1.parseFlipkartWorkbook)(node_fs_1.default.readFileSync(options.flipkart), {
+        sellerState: options.sellerState
+    });
+    const records = [...amazonB2B.records, ...amazonB2C.records, ...flipkart.records];
+    const documentIssues = [
+        ...amazonB2B.documentIssues,
+        ...amazonB2C.documentIssues,
+        ...flipkart.documentIssues
+    ];
+    const payload = (0, gstr1_1.buildMonthlyGSTR1)(records, documentIssues, {
         gstin: options.gstin,
         fp: options.fp
     });
     node_fs_1.default.writeFileSync(options.output, JSON.stringify(payload, null, 2), "utf8");
-    console.log(`Generated ${payload.b2cs.length} b2cs rows at ${options.output}`);
+    console.log(`Generated GST JSON at ${options.output}`);
 }
 if (require.main === module) {
-    run(getCLIOptions());
+    runMonthly(getCLIOptions());
 }

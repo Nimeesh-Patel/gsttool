@@ -1,20 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import { aggregateB2CS, buildGSTR1 } from "./gst/b2cs";
-import { parseAmazonCSV } from "./parsers/amazon";
+import { buildMonthlyGSTR1 } from "./gst/gstr1";
+import { parseAmazonB2BContent, parseAmazonB2CContent } from "./parsers/amazon";
+import { parseFlipkartWorkbook } from "./parsers/flipkart";
 import { DEFAULT_SELLER_STATE } from "./utils/stateCodes";
 
-export * from "./gst/b2cs";
+export * from "./gst/gstr1";
+export * from "./gst/types";
 export * from "./parsers/amazon";
+export * from "./parsers/flipkart";
 export * from "./utils/stateCodes";
 
 const DEFAULT_GSTIN = "07ABGFR8042N1ZO";
-const DEFAULT_FP = "022026";
-const DEFAULT_INPUT_FILE = "MTR_B2C-FEBRUARY-2026-A2G23RCK8NBZ6R.csv";
-const DEFAULT_OUTPUT_FILE = "gstr1-b2cs.json";
+const DEFAULT_FP = "032026";
+const DEFAULT_OUTPUT_FILE = "gstr1-returns.json";
 
-interface CLIOptions {
-  input: string;
+export interface MonthlyRunOptions {
+  amazonB2B: string;
+  amazonB2C: string;
+  flipkart: string;
   output: string;
   gstin: string;
   fp: string;
@@ -26,9 +30,20 @@ function readArg(flag: string): string | undefined {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-function getCLIOptions(): CLIOptions {
+function requireArg(flag: string): string {
+  const value = readArg(flag);
+  if (!value) {
+    throw new Error(`Missing required argument ${flag}`);
+  }
+
+  return value;
+}
+
+function getCLIOptions(): MonthlyRunOptions {
   return {
-    input: path.resolve(process.cwd(), readArg("--input") ?? DEFAULT_INPUT_FILE),
+    amazonB2B: path.resolve(process.cwd(), requireArg("--amazon-b2b")),
+    amazonB2C: path.resolve(process.cwd(), requireArg("--amazon-b2c")),
+    flipkart: path.resolve(process.cwd(), requireArg("--flipkart")),
     output: path.resolve(process.cwd(), readArg("--output") ?? DEFAULT_OUTPUT_FILE),
     gstin: readArg("--gstin") ?? DEFAULT_GSTIN,
     fp: readArg("--fp") ?? DEFAULT_FP,
@@ -36,9 +51,11 @@ function getCLIOptions(): CLIOptions {
   };
 }
 
-function assertCLIOptions(options: CLIOptions): void {
-  if (!fs.existsSync(options.input)) {
-    throw new Error(`Input file not found: ${options.input}`);
+function assertCLIOptions(options: MonthlyRunOptions): void {
+  for (const input of [options.amazonB2B, options.amazonB2C, options.flipkart]) {
+    if (!fs.existsSync(input)) {
+      throw new Error(`Input file not found: ${input}`);
+    }
   }
 
   if (!/^\d{6}$/.test(options.fp)) {
@@ -50,24 +67,35 @@ function assertCLIOptions(options: CLIOptions): void {
   }
 }
 
-export function run(options: CLIOptions): void {
+export function runMonthly(options: MonthlyRunOptions): void {
   assertCLIOptions(options);
 
-  const transactions = parseAmazonCSV(options.input, {
+  const amazonB2B = parseAmazonB2BContent(fs.readFileSync(options.amazonB2B), {
     sellerState: options.sellerState
   });
-  const b2cs = aggregateB2CS(transactions, {
+  const amazonB2C = parseAmazonB2CContent(fs.readFileSync(options.amazonB2C), {
     sellerState: options.sellerState
   });
-  const payload = buildGSTR1(b2cs, {
+  const flipkart = parseFlipkartWorkbook(fs.readFileSync(options.flipkart), {
+    sellerState: options.sellerState
+  });
+
+  const records = [...amazonB2B.records, ...amazonB2C.records, ...flipkart.records];
+  const documentIssues = [
+    ...amazonB2B.documentIssues,
+    ...amazonB2C.documentIssues,
+    ...flipkart.documentIssues
+  ];
+
+  const payload = buildMonthlyGSTR1(records, documentIssues, {
     gstin: options.gstin,
     fp: options.fp
   });
 
   fs.writeFileSync(options.output, JSON.stringify(payload, null, 2), "utf8");
-  console.log(`Generated ${payload.b2cs.length} b2cs rows at ${options.output}`);
+  console.log(`Generated GST JSON at ${options.output}`);
 }
 
 if (require.main === module) {
-  run(getCLIOptions());
+  runMonthly(getCLIOptions());
 }

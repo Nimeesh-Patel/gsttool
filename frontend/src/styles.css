@@ -65,6 +65,11 @@ input {
   padding: 18px;
 }
 
+.upload-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .upload-label,
 .success-title {
   display: block;

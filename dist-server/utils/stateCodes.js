@@ -1,9 +1,49 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_SELLER_STATE = void 0;
+exports.STATE_NAME_BY_CODE = exports.DEFAULT_SELLER_STATE = void 0;
 exports.toGSTStateCode = toGSTStateCode;
 exports.getSupplyType = getSupplyType;
+exports.getStateNameFromCode = getStateNameFromCode;
 exports.DEFAULT_SELLER_STATE = "07";
+exports.STATE_NAME_BY_CODE = {
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh",
+    "97": "Other Territory"
+};
 const STATE_CODE_MAP = {
     "01": "01",
     "JAMMUANDKASHMIR": "01",
@@ -69,6 +109,7 @@ const STATE_CODE_MAP = {
     "26": "26",
     "DADRAANDNAGARHAVELIANDDAMANANDDIU": "26",
     "DADRA AND NAGAR HAVELI AND DAMAN AND DIU": "26",
+    "DADRA & NAGAR HAVELI & DAMAN & DIU": "26",
     "DADRA&NAGARHAVELIANDDAMAN&DIU": "26",
     "27": "27",
     "MAHARASHTRA": "27",
@@ -101,7 +142,7 @@ const STATE_CODE_MAP = {
     "OTHERTERRITORY": "97"
 };
 function normalizeLookupKey(value) {
-    return value.replace(/[^A-Z0-9& ]/g, "").replace(/\s+/g, " ").trim();
+    return value.toUpperCase().replace(/[^A-Z0-9& ]/g, "").replace(/\s+/g, " ").trim();
 }
 function toGSTStateCode(state) {
     const raw = state.trim();
@@ -119,4 +160,7 @@ function toGSTStateCode(state) {
 }
 function getSupplyType(buyerState, sellerState) {
     return buyerState === sellerState ? "INTRA" : "INTER";
+}
+function getStateNameFromCode(code) {
+    return exports.STATE_NAME_BY_CODE[code] ?? code;
 }

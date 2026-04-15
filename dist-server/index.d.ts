@@ -1,11 +1,15 @@
-export * from "./gst/b2cs";
+export * from "./gst/gstr1";
+export * from "./gst/types";
 export * from "./parsers/amazon";
+export * from "./parsers/flipkart";
 export * from "./utils/stateCodes";
-interface CLIOptions {
-    input: string;
+export interface MonthlyRunOptions {
+    amazonB2B: string;
+    amazonB2C: string;
+    flipkart: string;
     output: string;
     gstin: string;
     fp: string;
     sellerState: string;
 }
-export declare function run(options: CLIOptions): void;
+export declare function runMonthly(options: MonthlyRunOptions): void;
